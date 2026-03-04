@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPERADMIN
+  LEADER
+  MEMBER
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  role         Role         @default(MEMBER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  ledGroups    Group[]      @relation("GroupLeader")
+}
+
+model Group {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  playlistUrl String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  leader      User         @relation("GroupLeader", fields: [leaderId], references: [id])
+  leaderId    String
+  members     Membership[]
+}
+
+model Membership {
+  id       String   @id @default(cuid())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId  String
+  joinedAt DateTime @default(now())
+
+  @@unique([userId, groupId])
+}
+
+model SiteSettings {
+  id             String   @id @default("singleton")
+  publicPlaylist String?
+  updatedAt      DateTime @updatedAt
+}
