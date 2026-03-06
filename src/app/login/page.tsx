@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const groupSlug = searchParams.get("group");
+  const registered = searchParams.get("registered") === "1";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,13 +29,18 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Invalid email or password");
     } else {
-      router.push("/dashboard");
+      router.push(groupSlug ? `/group/${groupSlug}` : "/dashboard");
     }
   }
 
   return (
     <div className="max-w-sm mx-auto pt-12 space-y-6">
       <h1 className="text-2xl font-bold text-center text-emerald-400">Sign in</h1>
+      {registered && (
+        <p className="text-emerald-400 text-sm text-center bg-emerald-950 border border-emerald-800 rounded-lg px-4 py-2.5">
+          Account created! Sign in to continue.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm text-stone-400 mb-1">Email</label>
@@ -69,5 +78,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
