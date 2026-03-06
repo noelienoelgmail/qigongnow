@@ -5,7 +5,7 @@ export default function Home() {
     <div className="space-y-10">
       <div className="text-center space-y-3 pt-6">
         <h1 className="text-4xl font-bold text-emerald-400 tracking-tight">
-          QiGong Together
+          QiGong Now
         </h1>
         <p className="text-stone-400 text-lg max-w-xl mx-auto">
           Every hour on the hour, a practice begins. Join anonymously or{" "}

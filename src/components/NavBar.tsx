@@ -10,7 +10,7 @@ export default function NavBar() {
   return (
     <nav className="bg-stone-950 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
       <Link href="/" className="text-lg font-semibold text-emerald-400 tracking-wide">
-        QiGong Together
+        QiGong Now
       </Link>
       <div className="flex items-center gap-5 text-sm">
         {session ? (

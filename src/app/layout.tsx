@@ -7,7 +7,7 @@ import NavBar from "@/components/NavBar";
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "QiGong Together",
+  title: "QiGong Now",
   description: "Practice qigong with your group, any hour of the day.",
 };
 
