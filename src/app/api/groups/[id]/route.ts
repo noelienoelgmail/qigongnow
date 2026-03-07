@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
+// GET /api/groups/[id] - fetch single group (superadmin or group leader)
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const sessionUser = session.user as { id: string; role: string };
+  const group = await prisma.group.findUnique({
+    where: { id },
+    include: { leader: { select: { id: true, name: true, email: true } } },
+  });
+  if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (sessionUser.role !== "SUPERADMIN" && group.leaderId !== sessionUser.id)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  return NextResponse.json(group);
+}
+
 // PATCH /api/groups/[id] - update group (leader of group or superadmin)
 export async function PATCH(
   req: NextRequest,

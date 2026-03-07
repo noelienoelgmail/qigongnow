@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Group {
   id: string;
@@ -129,18 +130,25 @@ export default function LeaderPage() {
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-widest text-stone-500">Your groups</p>
           {groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => selectGroup(g)}
-              className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                selected?.id === g.id
-                  ? "border-sky-600 bg-sky-950"
-                  : "border-stone-800 bg-stone-900 hover:border-stone-600"
-              }`}
-            >
-              <p className="font-medium text-stone-200 text-sm">{g.name}</p>
-              <p className="text-stone-500 text-xs">/{g.slug}</p>
-            </button>
+            <div key={g.id} className="flex gap-1">
+              <button
+                onClick={() => selectGroup(g)}
+                className={`flex-1 text-left px-4 py-3 rounded-lg border transition-colors ${
+                  selected?.id === g.id
+                    ? "border-sky-600 bg-sky-950"
+                    : "border-stone-800 bg-stone-900 hover:border-stone-600"
+                }`}
+              >
+                <p className="font-medium text-stone-200 text-sm">{g.name}</p>
+                <p className="text-stone-500 text-xs">/{g.slug}</p>
+              </button>
+              <Link
+                href={`/admin/groups/${g.id}`}
+                className="flex items-center px-3 rounded-lg border border-stone-800 bg-stone-900 text-stone-500 hover:text-stone-300 hover:border-stone-600 text-xs transition-colors"
+              >
+                Manage
+              </Link>
+            </div>
           ))}
           <button
             onClick={() => {
