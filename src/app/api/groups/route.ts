@@ -30,17 +30,15 @@ export async function GET() {
   return NextResponse.json(groups);
 }
 
-// POST /api/groups - create a group (leader or superadmin)
+// POST /api/groups - create a group
+// LEADER/SUPERADMIN: active immediately
+// MEMBER: created as inactive (pending admin approval)
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const user = session.user as { id: string; role: string };
-  if (user.role !== "LEADER" && user.role !== "SUPERADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const { name, slug, description, playlistUrl } = await req.json();
   if (!name || !slug)
     return NextResponse.json({ error: "name and slug are required" }, { status: 400 });
@@ -49,8 +47,10 @@ export async function POST(req: NextRequest) {
   if (existing)
     return NextResponse.json({ error: "Slug already taken" }, { status: 409 });
 
+  const isActive = user.role === "LEADER" || user.role === "SUPERADMIN";
+
   const group = await prisma.group.create({
-    data: { name, slug, description, playlistUrl, leaderId: user.id },
+    data: { name, slug, description, playlistUrl, leaderId: user.id, isActive },
   });
 
   return NextResponse.json(group, { status: 201 });

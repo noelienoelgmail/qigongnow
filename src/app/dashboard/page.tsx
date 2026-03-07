@@ -7,7 +7,8 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const userId = (session.user as { id: string }).id;
+  const userId = (session.user as { id: string; role: string }).id;
+  const userRole = (session.user as { id: string; role: string }).role;
 
   const memberships = await prisma.membership.findMany({
     where: { userId },
@@ -34,19 +35,26 @@ export default async function DashboardPage() {
             Groups you lead
           </h2>
           <div className="grid gap-3">
-            {ledGroups.map((g: { id: string; name: string; slug: string; _count: { members: number } }) => (
+            {ledGroups.map((g: { id: string; name: string; slug: string; isActive: boolean; _count: { members: number } }) => (
               <Link
                 key={g.id}
-                href={`/group/${g.slug}`}
+                href={`/${g.slug}`}
                 className="flex items-center justify-between bg-stone-900 border border-stone-800 rounded-xl p-5 hover:border-emerald-700 transition-colors"
               >
                 <div>
                   <p className="font-semibold text-stone-100">{g.name}</p>
                   <p className="text-stone-500 text-sm">{g._count.members} members</p>
                 </div>
-                <span className="text-xs bg-emerald-900 text-emerald-300 px-2 py-1 rounded-full">
-                  Leader
-                </span>
+                <div className="flex items-center gap-2">
+                  {!g.isActive && (
+                    <span className="text-xs bg-amber-900 text-amber-300 px-2 py-1 rounded-full">
+                      Pending
+                    </span>
+                  )}
+                  <span className="text-xs bg-emerald-900 text-emerald-300 px-2 py-1 rounded-full">
+                    Leader
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
@@ -62,7 +70,7 @@ export default async function DashboardPage() {
             {memberships.map(({ group }: { group: { id: string; name: string; slug: string; leader: { name: string } } }) => (
               <Link
                 key={group.id}
-                href={`/group/${group.slug}`}
+                href={`/${group.slug}`}
                 className="flex items-center justify-between bg-stone-900 border border-stone-800 rounded-xl p-5 hover:border-emerald-700 transition-colors"
               >
                 <div>
@@ -88,6 +96,15 @@ export default async function DashboardPage() {
             </Link>
             .
           </p>
+        </div>
+      )}
+
+      {userRole === "MEMBER" && (
+        <div className="border-t border-stone-800 pt-8 text-center space-y-2">
+          <p className="text-stone-500 text-sm">Want to lead your own practice group?</p>
+          <Link href="/leader" className="text-sky-400 hover:text-sky-300 underline underline-offset-2 text-sm">
+            Request a group →
+          </Link>
         </div>
       )}
     </div>

@@ -29,7 +29,7 @@ function LoginForm() {
     if (result?.error) {
       setError("Invalid email or password");
     } else {
-      router.push(groupSlug ? `/group/${groupSlug}` : "/dashboard");
+      router.push(groupSlug ? `/${groupSlug}` : "/dashboard");
     }
   }
 

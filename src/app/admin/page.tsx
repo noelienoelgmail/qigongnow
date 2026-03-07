@@ -15,7 +15,7 @@ interface Group {
 
 interface Member {
   id: string;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; role: string };
 }
 
 export default function AdminPage() {
@@ -64,6 +64,17 @@ export default function AdminPage() {
     await fetch(`/api/groups/${id}`, { method: "DELETE" });
     setGroups((prev) => prev.filter((g) => g.id !== id));
     if (expandedGroupId === id) setExpandedGroupId(null);
+  }
+
+  async function approveGroup(id: string) {
+    const res = await fetch(`/api/groups/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: true }),
+    });
+    if (res.ok) {
+      setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, isActive: true } : g)));
+    }
   }
 
   async function toggleGroup(id: string, isActive: boolean) {
@@ -116,7 +127,126 @@ export default function AdminPage() {
     }
   }
 
+  async function changeUserRole(userId: string, newRole: "LEADER" | "MEMBER") {
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole }),
+    });
+    if (res.ok) {
+      setMembers((prev) => prev.map((m) =>
+        m.user.id === userId ? { ...m, user: { ...m.user, role: newRole } } : m
+      ));
+    }
+  }
+
   if (status === "loading") return null;
+
+  const pendingGroups = groups.filter((g) => !g.isActive);
+  const activeGroups = groups.filter((g) => g.isActive);
+
+  function GroupMemberPanel({ g }: { g: Group }) {
+    return (
+      <div key={g.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4">
+          <div>
+            <p className="font-medium text-stone-200">{g.name}</p>
+            <p className="text-stone-500 text-xs">
+              /{g.slug} · {g._count.members} members · led by {g.leader.name}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => toggleMembers(g.id)}
+              className="text-xs px-3 py-1 rounded-full border border-stone-700 text-stone-400 hover:bg-stone-800 transition-colors"
+            >
+              {expandedGroupId === g.id ? "Hide members" : "Members"}
+            </button>
+            <button
+              onClick={() => toggleGroup(g.id, g.isActive)}
+              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                g.isActive
+                  ? "border-emerald-700 text-emerald-400 hover:bg-emerald-950"
+                  : "border-stone-700 text-stone-500 hover:bg-stone-800"
+              }`}
+            >
+              {g.isActive ? "Active" : "Inactive"}
+            </button>
+            <button
+              onClick={() => deleteGroup(g.id)}
+              className="text-xs text-red-500 hover:text-red-400 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        {expandedGroupId === g.id && (
+          <div className="border-t border-stone-800 px-5 py-4 space-y-3">
+            {members.length === 0 && (
+              <p className="text-stone-500 text-sm">No members yet.</p>
+            )}
+            {members.map((m) => (
+              <div key={m.user.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div>
+                    <p className="text-sm text-stone-300">{m.user.name}</p>
+                    <p className="text-xs text-stone-500">{m.user.email}</p>
+                  </div>
+                  {(m.user.role === "LEADER" || m.user.role === "SUPERADMIN") && (
+                    <span className="text-xs bg-sky-900 text-sky-300 px-2 py-0.5 rounded-full">
+                      {m.user.role === "SUPERADMIN" ? "Superadmin" : "Leader"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {m.user.role === "MEMBER" && (
+                    <button
+                      onClick={() => changeUserRole(m.user.id, "LEADER")}
+                      className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+                    >
+                      Make Leader
+                    </button>
+                  )}
+                  {m.user.role === "LEADER" && (
+                    <button
+                      onClick={() => changeUserRole(m.user.id, "MEMBER")}
+                      className="text-xs text-stone-400 hover:text-stone-300 transition-colors"
+                    >
+                      Revoke Leader
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeMember(g.id, m.user.id)}
+                    className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <input
+                type="email"
+                placeholder="user@example.com"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addMember(g.id)}
+                className="flex-1 bg-stone-950 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                onClick={() => addMember(g.id)}
+                className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                Add
+              </button>
+            </div>
+            {memberMessage && <p className="text-red-400 text-xs">{memberMessage}</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -151,88 +281,47 @@ export default function AdminPage() {
         </button>
       </section>
 
-      {/* All groups */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-stone-200">All Groups</h2>
-        {groups.length === 0 && (
-          <p className="text-stone-500 text-sm">No groups registered yet.</p>
-        )}
-        <div className="space-y-3">
-          {groups.map((g) => (
-            <div key={g.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4">
+      {/* Pending groups */}
+      {pendingGroups.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-amber-300">Pending Approval</h2>
+          <div className="space-y-3">
+            {pendingGroups.map((g) => (
+              <div key={g.id} className="flex items-center justify-between bg-stone-900 border border-amber-900 rounded-xl px-5 py-4">
                 <div>
                   <p className="font-medium text-stone-200">{g.name}</p>
                   <p className="text-stone-500 text-xs">
-                    /group/{g.slug} · {g._count.members} members · led by {g.leader.name}
+                    /{g.slug} · requested by {g.leader.name} ({g.leader.email})
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => toggleMembers(g.id)}
-                    className="text-xs px-3 py-1 rounded-full border border-stone-700 text-stone-400 hover:bg-stone-800 transition-colors"
+                    onClick={() => approveGroup(g.id)}
+                    className="text-xs px-3 py-1 rounded-full border border-emerald-700 text-emerald-400 hover:bg-emerald-950 transition-colors"
                   >
-                    {expandedGroupId === g.id ? "Hide members" : "Members"}
-                  </button>
-                  <button
-                    onClick={() => toggleGroup(g.id, g.isActive)}
-                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                      g.isActive
-                        ? "border-emerald-700 text-emerald-400 hover:bg-emerald-950"
-                        : "border-stone-700 text-stone-500 hover:bg-stone-800"
-                    }`}
-                  >
-                    {g.isActive ? "Active" : "Inactive"}
+                    Approve
                   </button>
                   <button
                     onClick={() => deleteGroup(g.id)}
                     className="text-xs text-red-500 hover:text-red-400 transition-colors"
                   >
-                    Delete
+                    Reject
                   </button>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-              {expandedGroupId === g.id && (
-                <div className="border-t border-stone-800 px-5 py-4 space-y-3">
-                  {members.length === 0 && (
-                    <p className="text-stone-500 text-sm">No members yet.</p>
-                  )}
-                  {members.map((m) => (
-                    <div key={m.user.id} className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-stone-300">{m.user.name}</p>
-                        <p className="text-xs text-stone-500">{m.user.email}</p>
-                      </div>
-                      <button
-                        onClick={() => removeMember(g.id, m.user.id)}
-                        className="text-xs text-red-500 hover:text-red-400 transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  <div className="flex gap-2 pt-2">
-                    <input
-                      type="email"
-                      placeholder="user@example.com"
-                      value={addEmail}
-                      onChange={(e) => setAddEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addMember(g.id)}
-                      className="flex-1 bg-stone-950 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
-                    />
-                    <button
-                      onClick={() => addMember(g.id)}
-                      className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {memberMessage && <p className="text-red-400 text-xs">{memberMessage}</p>}
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Active groups */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-stone-200">All Groups</h2>
+        {activeGroups.length === 0 && (
+          <p className="text-stone-500 text-sm">No active groups yet.</p>
+        )}
+        <div className="space-y-3">
+          {activeGroups.map((g) => <GroupMemberPanel key={g.id} g={g} />)}
         </div>
       </section>
     </div>
