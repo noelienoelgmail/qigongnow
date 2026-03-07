@@ -99,6 +99,12 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      <div className="border-t border-stone-800 pt-6 text-right">
+        <Link href="/account" className="text-stone-500 hover:text-stone-300 text-sm underline underline-offset-2">
+          Account settings
+        </Link>
+      </div>
+
       {userRole === "MEMBER" && (
         <div className="border-t border-stone-800 pt-8 text-center space-y-2">
           <p className="text-stone-500 text-sm">Want to lead your own practice group?</p>
