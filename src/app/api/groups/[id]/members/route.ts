@@ -53,7 +53,10 @@ export async function POST(
 
   const membership = await prisma.membership.create({
     data: { userId: target.id, groupId: id },
-    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    include: {
+      user: { select: { id: true, name: true, email: true, role: true } },
+      group: { select: { id: true, name: true, slug: true } },
+    },
   });
   return NextResponse.json(membership, { status: 201 });
 }

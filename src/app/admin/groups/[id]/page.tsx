@@ -140,6 +140,19 @@ export default function ManageGroupPage() {
     if (res.ok) setMembers((prev) => prev.filter((m) => m.user.id !== userId));
   }
 
+  async function changeRole(userId: string, newRole: "LEADER" | "MEMBER") {
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole }),
+    });
+    if (res.ok) {
+      setMembers((prev) =>
+        prev.map((m) => m.user.id === userId ? { ...m, user: { ...m.user, role: newRole } } : m)
+      );
+    }
+  }
+
   if (status === "loading" || !group) return null;
 
   const backHref = isSuperadmin ? "/admin" : "/leader";
@@ -219,12 +232,30 @@ export default function ManageGroupPage() {
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => removeMember(m.user.id)}
-                className="text-xs text-red-500 hover:text-red-400 transition-colors"
-              >
-                Remove
-              </button>
+              <div className="flex items-center gap-3">
+                {isSuperadmin && m.user.role === "MEMBER" && (
+                  <button
+                    onClick={() => changeRole(m.user.id, "LEADER")}
+                    className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+                  >
+                    Make Leader
+                  </button>
+                )}
+                {isSuperadmin && m.user.role === "LEADER" && (
+                  <button
+                    onClick={() => changeRole(m.user.id, "MEMBER")}
+                    className="text-xs text-stone-400 hover:text-stone-300 transition-colors"
+                  >
+                    Revoke Leader
+                  </button>
+                )}
+                <button
+                  onClick={() => removeMember(m.user.id)}
+                  className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
         </div>
