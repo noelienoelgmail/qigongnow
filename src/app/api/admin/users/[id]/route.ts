@@ -47,6 +47,16 @@ export async function PATCH(
   if (role && !["MEMBER", "LEADER", "SUPERADMIN"].includes(role))
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
 
+  // Prevent demoting the last superadmin
+  if (role && role !== "SUPERADMIN") {
+    const current = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+    if (current?.role === "SUPERADMIN") {
+      const count = await prisma.user.count({ where: { role: "SUPERADMIN" } });
+      if (count <= 1)
+        return NextResponse.json({ error: "Cannot remove the only superadmin" }, { status: 400 });
+    }
+  }
+
   if (email) {
     const existing = await prisma.user.findFirst({ where: { email, NOT: { id } } });
     if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });

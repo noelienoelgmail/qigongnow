@@ -17,13 +17,13 @@ interface UserDetail {
   ledGroups: Group[];
 }
 
-const ROLE_LABELS: Record<string, string> = { MEMBER: "Member", LEADER: "Leader", SUPERADMIN: "Superadmin" };
 
 export default function ManageUserPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
 
+  const sessionUserId = (session?.user as { id?: string })?.id;
   const [user, setUser] = useState<UserDetail | null>(null);
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [form, setForm] = useState({ name: "", email: "", role: "" });
@@ -149,17 +149,22 @@ export default function ManageUserPage() {
             />
           </div>
         ))}
-        <div>
-          <label className="block text-sm text-stone-400 mb-1">Role</label>
-          <select
-            value={form.role}
-            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-            className="w-full bg-stone-950 border border-stone-700 rounded-lg px-4 py-2.5 text-stone-100 focus:outline-none focus:border-amber-500"
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm text-stone-300">Superadmin</p>
+            <p className="text-xs text-stone-500">Full access to all admin features</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm((f) => ({ ...f, role: f.role === "SUPERADMIN" ? "MEMBER" : "SUPERADMIN" }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              form.role === "SUPERADMIN" ? "bg-amber-500" : "bg-stone-700"
+            }`}
           >
-            {Object.entries(ROLE_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
-            ))}
-          </select>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              form.role === "SUPERADMIN" ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
         </div>
         {infoMsg && <p className={`text-sm ${infoMsg === "Saved!" ? "text-emerald-400" : "text-red-400"}`}>{infoMsg}</p>}
         <button onClick={saveInfo} disabled={saving}
