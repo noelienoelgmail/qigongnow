@@ -13,6 +13,11 @@ interface Group {
   _count: { members: number };
 }
 
+interface Member {
+  id: string;
+  user: { id: string; name: string; email: string };
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -20,6 +25,10 @@ export default function AdminPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [addEmail, setAddEmail] = useState("");
+  const [memberMessage, setMemberMessage] = useState("");
 
   const role = (session?.user as { role?: string })?.role;
 
@@ -54,6 +63,7 @@ export default function AdminPage() {
     if (!confirm("Delete this group? This cannot be undone.")) return;
     await fetch(`/api/groups/${id}`, { method: "DELETE" });
     setGroups((prev) => prev.filter((g) => g.id !== id));
+    if (expandedGroupId === id) setExpandedGroupId(null);
   }
 
   async function toggleGroup(id: string, isActive: boolean) {
@@ -65,6 +75,44 @@ export default function AdminPage() {
     if (res.ok) {
       const updated = await res.json();
       setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, isActive: updated.isActive } : g)));
+    }
+  }
+
+  async function toggleMembers(groupId: string) {
+    if (expandedGroupId === groupId) {
+      setExpandedGroupId(null);
+      return;
+    }
+    const res = await fetch(`/api/groups/${groupId}/members`);
+    const data = await res.json();
+    setMembers(data);
+    setExpandedGroupId(groupId);
+    setAddEmail("");
+    setMemberMessage("");
+  }
+
+  async function addMember(groupId: string) {
+    const res = await fetch(`/api/groups/${groupId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: addEmail }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMembers((prev) => [...prev, data]);
+      setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, _count: { members: g._count.members + 1 } } : g));
+      setAddEmail("");
+      setMemberMessage("");
+    } else {
+      setMemberMessage(data.error ?? "Failed to add member");
+    }
+  }
+
+  async function removeMember(groupId: string, userId: string) {
+    const res = await fetch(`/api/groups/${groupId}/members?userId=${userId}`, { method: "DELETE" });
+    if (res.ok) {
+      setMembers((prev) => prev.filter((m) => m.user.id !== userId));
+      setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, _count: { members: g._count.members - 1 } } : g));
     }
   }
 
@@ -111,34 +159,78 @@ export default function AdminPage() {
         )}
         <div className="space-y-3">
           {groups.map((g) => (
-            <div
-              key={g.id}
-              className="flex items-center justify-between bg-stone-900 border border-stone-800 rounded-xl px-5 py-4"
-            >
-              <div>
-                <p className="font-medium text-stone-200">{g.name}</p>
-                <p className="text-stone-500 text-xs">
-                  /group/{g.slug} · {g._count.members} members · led by {g.leader.name}
-                </p>
+            <div key={g.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4">
+                <div>
+                  <p className="font-medium text-stone-200">{g.name}</p>
+                  <p className="text-stone-500 text-xs">
+                    /group/{g.slug} · {g._count.members} members · led by {g.leader.name}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleMembers(g.id)}
+                    className="text-xs px-3 py-1 rounded-full border border-stone-700 text-stone-400 hover:bg-stone-800 transition-colors"
+                  >
+                    {expandedGroupId === g.id ? "Hide members" : "Members"}
+                  </button>
+                  <button
+                    onClick={() => toggleGroup(g.id, g.isActive)}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                      g.isActive
+                        ? "border-emerald-700 text-emerald-400 hover:bg-emerald-950"
+                        : "border-stone-700 text-stone-500 hover:bg-stone-800"
+                    }`}
+                  >
+                    {g.isActive ? "Active" : "Inactive"}
+                  </button>
+                  <button
+                    onClick={() => deleteGroup(g.id)}
+                    className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toggleGroup(g.id, g.isActive)}
-                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                    g.isActive
-                      ? "border-emerald-700 text-emerald-400 hover:bg-emerald-950"
-                      : "border-stone-700 text-stone-500 hover:bg-stone-800"
-                  }`}
-                >
-                  {g.isActive ? "Active" : "Inactive"}
-                </button>
-                <button
-                  onClick={() => deleteGroup(g.id)}
-                  className="text-xs text-red-500 hover:text-red-400 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+
+              {expandedGroupId === g.id && (
+                <div className="border-t border-stone-800 px-5 py-4 space-y-3">
+                  {members.length === 0 && (
+                    <p className="text-stone-500 text-sm">No members yet.</p>
+                  )}
+                  {members.map((m) => (
+                    <div key={m.user.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-stone-300">{m.user.name}</p>
+                        <p className="text-xs text-stone-500">{m.user.email}</p>
+                      </div>
+                      <button
+                        onClick={() => removeMember(g.id, m.user.id)}
+                        className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-2">
+                    <input
+                      type="email"
+                      placeholder="user@example.com"
+                      value={addEmail}
+                      onChange={(e) => setAddEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addMember(g.id)}
+                      className="flex-1 bg-stone-950 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      onClick={() => addMember(g.id)}
+                      className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {memberMessage && <p className="text-red-400 text-xs">{memberMessage}</p>}
+                </div>
+              )}
             </div>
           ))}
         </div>
