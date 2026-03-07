@@ -2,25 +2,61 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-// PATCH /api/admin/users/[id] - change user role (superadmin only)
-// Body: { role: "LEADER" | "MEMBER" }
+async function requireSuperadmin() {
+  const session = await auth();
+  if (!session?.user) return null;
+  return (session.user as { role: string }).role === "SUPERADMIN" ? session : null;
+}
+
+// GET /api/admin/users/[id] - full user details
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await requireSuperadmin()))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await params;
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      memberships: { include: { group: { select: { id: true, name: true, slug: true } } } },
+      ledGroups: { select: { id: true, name: true, slug: true, isActive: true } },
+    },
+  });
+  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(user);
+}
+
+// PATCH /api/admin/users/[id] - update name, email, role
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const sessionUser = session.user as { role: string };
-  if (sessionUser.role !== "SUPERADMIN")
+  if (!(await requireSuperadmin()))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { role } = await req.json();
-  if (role !== "LEADER" && role !== "MEMBER")
-    return NextResponse.json({ error: "role must be LEADER or MEMBER" }, { status: 400 });
+  const { name, email, role } = await req.json();
 
-  const updated = await prisma.user.update({ where: { id }, data: { role } });
-  return NextResponse.json({ id: updated.id, role: updated.role });
+  if (role && !["MEMBER", "LEADER", "SUPERADMIN"].includes(role))
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+
+  if (email) {
+    const existing = await prisma.user.findFirst({ where: { email, NOT: { id } } });
+    if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+  }
+
+  const data: Record<string, unknown> = {};
+  if (name) data.name = name;
+  if (email) data.email = email;
+  if (role) data.role = role;
+
+  const updated = await prisma.user.update({ where: { id }, data });
+  return NextResponse.json({ id: updated.id, name: updated.name, email: updated.email, role: updated.role });
 }

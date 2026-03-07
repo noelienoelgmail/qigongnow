@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Group {
   id: string;
@@ -18,6 +19,14 @@ interface Member {
   user: { id: string; name: string; email: string; role: string };
 }
 
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  _count: { memberships: number; ledGroups: number };
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -29,6 +38,12 @@ export default function AdminPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [addEmail, setAddEmail] = useState("");
   const [memberMessage, setMemberMessage] = useState("");
+
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [userPage, setUserPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userPages, setUserPages] = useState(1);
+  const [userSearch, setUserSearch] = useState("");
 
   const role = (session?.user as { role?: string })?.role;
 
@@ -46,6 +61,13 @@ export default function AdminPage() {
       .then((r) => r.json())
       .then(setGroups);
   }, [role]);
+
+  useEffect(() => {
+    if (role !== "SUPERADMIN") return;
+    fetch(`/api/admin/users?page=${userPage}&search=${encodeURIComponent(userSearch)}`)
+      .then((r) => r.json())
+      .then((d) => { setUsers(d.users ?? []); setUserTotal(d.total ?? 0); setUserPages(d.pages ?? 1); });
+  }, [role, userPage, userSearch]);
 
   async function saveSettings() {
     setSaving(true);
@@ -323,6 +345,42 @@ export default function AdminPage() {
         <div className="space-y-3">
           {activeGroups.map((g) => <GroupMemberPanel key={g.id} g={g} />)}
         </div>
+      </section>
+      {/* All members */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-stone-200">All Members ({userTotal})</h2>
+        <input
+          type="search"
+          placeholder="Search by name or email…"
+          value={userSearch}
+          onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+          className="w-full bg-stone-900 border border-stone-800 rounded-lg px-4 py-2.5 text-stone-100 focus:outline-none focus:border-amber-500"
+        />
+        <div className="space-y-2">
+          {users.map((u) => (
+            <div key={u.id} className="flex items-center justify-between bg-stone-900 border border-stone-800 rounded-xl px-5 py-3">
+              <div>
+                <p className="text-sm font-medium text-stone-200">{u.name}</p>
+                <p className="text-xs text-stone-500">{u.email} · {u.role.toLowerCase()} · {u._count.memberships} groups</p>
+              </div>
+              <Link
+                href={`/admin/users/${u.id}`}
+                className="text-xs px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 hover:bg-stone-800 transition-colors"
+              >
+                Manage
+              </Link>
+            </div>
+          ))}
+        </div>
+        {userPages > 1 && (
+          <div className="flex items-center gap-3 pt-2">
+            <button onClick={() => setUserPage((p) => Math.max(1, p - 1))} disabled={userPage === 1}
+              className="text-sm text-stone-400 hover:text-white disabled:opacity-40">← Prev</button>
+            <span className="text-sm text-stone-500">Page {userPage} of {userPages}</span>
+            <button onClick={() => setUserPage((p) => Math.min(userPages, p + 1))} disabled={userPage === userPages}
+              className="text-sm text-stone-400 hover:text-white disabled:opacity-40">Next →</button>
+          </div>
+        )}
       </section>
     </div>
   );

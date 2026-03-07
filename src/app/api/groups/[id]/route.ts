@@ -21,7 +21,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const allowed = ["name", "description", "playlistUrl", "isActive"];
+  const allowed = user.role === "SUPERADMIN"
+    ? ["name", "slug", "description", "playlistUrl", "isActive", "leaderId"]
+    : ["name", "description", "playlistUrl", "isActive"];
   const data: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) data[key] = body[key];
